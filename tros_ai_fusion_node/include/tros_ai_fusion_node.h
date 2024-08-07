@@ -34,21 +34,18 @@ class TrosAiMsgFusionNode : public rclcpp::Node {
    // 不包含 base topic
    std::vector<std::string> fusion_topic_names_ = {"tros_det", "tros_seg"};
 
+  std::string srv_topic_manage_topic_name_ = "tros_topic_manage";
    rclcpp::Service<tros_ai_fusion_msgs::srv::TopicManage>::SharedPtr srv_topic_manage_ = nullptr;
 
    using MsgCacheType = std::map<std::string, ai_msgs::msg::PerceptionTargets::SharedPtr>;
-  //  std::map<builtin_interfaces::msg::Time, MsgCacheType> msg_cache_;
   // key is time stamp
    std::map<std::string, MsgCacheType> msg_cache_;
    std::mutex sync_msgs_cache_mutex_;
-   std::condition_variable sync_msgs_cache_cond_;
    size_t sync_msgs_cache_max_size_ = 10;
-   std::thread msgs_fusion_thread_;
 
   std::string pub_fusion_topic_name_ = "fusion_ai_msg";
   rclcpp::Publisher<ai_msgs::msg::PerceptionTargets>::SharedPtr ai_msg_publisher_ = nullptr;
 
-   void timer_callback();
    void topic_manage_callback(
    const std::shared_ptr<rmw_request_id_t>/*request_header*/,
    const std::shared_ptr<tros_ai_fusion_msgs::srv::TopicManage::Request>/*request*/,
@@ -59,6 +56,8 @@ class TrosAiMsgFusionNode : public rclcpp::Node {
    const ai_msgs::msg::PerceptionTargets::ConstSharedPtr msg2);
 
    void FusionMsg(MsgCacheType msg_cache);
+   std::vector<std::string> RegisterSynchronizer(
+    const std::vector<std::string>& topic_names);
 };
 
 }

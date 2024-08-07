@@ -10,10 +10,6 @@ TrosAiMsgFusionNode::TrosAiMsgFusionNode(const rclcpp::NodeOptions &options) :
   fusion_topic_name_base_ = this->declare_parameter("topic_name_base", fusion_topic_name_base_);
   pub_fusion_topic_name_= this->declare_parameter("pub_fusion_topic_name", pub_fusion_topic_name_);
 
-  // timer_callback();
-  // timer_ = this->create_wall_timer(std::chrono::milliseconds(1000),
-  //   std::bind(&TrosAiMsgFusionNode::timer_callback, this));
-
   std::stringstream ss;
   for (const auto &topic_name : fusion_topic_names_) {
     ss << "\n\t" << topic_name;
@@ -22,6 +18,10 @@ TrosAiMsgFusionNode::TrosAiMsgFusionNode(const rclcpp::NodeOptions &options) :
     "\n topic_name_base [" << fusion_topic_name_base_ << "]"
     << "\n topic_names_fusion: " << ss.str()
     << "\n pub_fusion_topic_name [" << pub_fusion_topic_name_ << "]"
+    << "\n srv_topic_manage_topic_name [" << srv_topic_manage_topic_name_
+      << "], you can do action [" << tros_ai_fusion_msgs::srv::TopicManage::Request::ADD
+      << "|" << tros_ai_fusion_msgs::srv::TopicManage::Request::DELETE
+      << "|" << tros_ai_fusion_msgs::srv::TopicManage::Request::GET << "]"
   );
 
   ai_msg_publisher_ = this->create_publisher<ai_msgs::msg::PerceptionTargets>(
@@ -29,90 +29,103 @@ TrosAiMsgFusionNode::TrosAiMsgFusionNode(const rclcpp::NodeOptions &options) :
     rclcpp::QoS(10));
   base_sub_.subscribe(this, fusion_topic_name_base_);
   srv_topic_manage_ = this->create_service<tros_ai_fusion_msgs::srv::TopicManage>(
-    "topic_manage",
+    srv_topic_manage_topic_name_,
     std::bind(&TrosAiMsgFusionNode::topic_manage_callback,
     this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
     
-  for (auto & topic : fusion_topic_names_) {
-    if (topic.empty()) {
-      RCLCPP_ERROR_STREAM(this->get_logger(),
-        "topic name is empty");
-      continue;
-    } else {
-      if (synchronizers_map_.find(topic) != synchronizers_map_.end()) {
-        RCLCPP_ERROR_STREAM(this->get_logger(),
-          "topic name already exists: " << topic);
-        continue;
-      } else {
-        RCLCPP_WARN_STREAM(this->get_logger(),
-          "topic: " << topic << ", sync with base topic: " << fusion_topic_name_base_);
-        subs_map_[topic].subscribe(this, topic);
-        auto sync = std::make_shared<SynchronizerType>(CustomSyncPolicyType(10), base_sub_, subs_map_[topic]);
-        synchronizers_map_[topic] = sync;
-        synchronizers_map_[topic]->registerCallback(std::bind(&TrosAiMsgFusionNode::TopicSyncCallback,
-          this, fusion_topic_name_base_, topic,
-          std::placeholders::_1, std::placeholders::_2));
-      }
-    }
-  }
-
-  RCLCPP_WARN_STREAM(get_logger(),
-    "fusion_topic_names size:" << fusion_topic_names_.size()
-    << " synchronizers_map_ size:" << synchronizers_map_.size());
-}
-
-void TrosAiMsgFusionNode::timer_callback() {
+  RegisterSynchronizer(fusion_topic_names_);
 }
 
 void TrosAiMsgFusionNode::topic_manage_callback(
   const std::shared_ptr<rmw_request_id_t>/*request_header*/,
   const std::shared_ptr<tros_ai_fusion_msgs::srv::TopicManage::Request> request,
   const std::shared_ptr<tros_ai_fusion_msgs::srv::TopicManage::Response> response) {
+  RCLCPP_WARN(get_logger(), "topic_manage_callback request->action [%s]",
+    request->action.data());
 
   if (request->action == tros_ai_fusion_msgs::srv::TopicManage::Request::ADD) {
-    // if (request->topics.empty()) {
-    //   response->result = false;
-    //   RCLCPP_ERROR_STREAM(this->get_logger(),
-    //     "topic name is empty");
-    //   return;
-    // }
+    if (request->topics.empty()) {
+      response->result = false;
+      RCLCPP_ERROR_STREAM(this->get_logger(),
+        "topic name is empty");
+      return;
+    }
+    
+    std::stringstream ss;
+    ss << "Add fusion topics: ";
+    for (const auto& name : request->topics) {
+      ss << name << ", ";
+    }
+    RCLCPP_WARN_STREAM(this->get_logger(),
+      ss.str()
+      );
 
     response->result = true;
-    
-    for (auto & topic : request->topics) 
-    {
-      if (topic.empty()) {
-        RCLCPP_ERROR_STREAM(this->get_logger(),
-          "topic name is empty");
-        continue;
-      } else {
-        if (synchronizers_map_.find(topic) != synchronizers_map_.end()) {
-          RCLCPP_ERROR_STREAM(this->get_logger(),
-            "topic name already exists: " << topic);
-          continue;
-        } else {
-          RCLCPP_WARN_STREAM(this->get_logger(),
-            "add topic: " << topic << ", sync with base topic: " << fusion_topic_name_base_);
-          subs_map_[topic].subscribe(this, topic);
-
-          auto sync = std::make_shared<SynchronizerType>(CustomSyncPolicyType(10), base_sub_, subs_map_[topic]);
-          sync->registerCallback(std::bind(&TrosAiMsgFusionNode::TopicSyncCallback,
-            this, fusion_topic_name_base_, topic,
-            std::placeholders::_1, std::placeholders::_2));
-          synchronizers_map_[topic] = sync;
-        }
-      }
+    auto registered_topics = RegisterSynchronizer(request->topics);
+    if (!registered_topics.empty()) {
+      fusion_topic_names_.insert(fusion_topic_names_.end(),
+        registered_topics.begin(), registered_topics.end());
     }
   } else if (request->action == tros_ai_fusion_msgs::srv::TopicManage::Request::DELETE)
   {
+    if (request->topics.empty()) {
+      response->result = false;
+      RCLCPP_ERROR_STREAM(this->get_logger(),
+        "topic name is empty");
+      return;
+    }
+    
+    std::stringstream ss;
+    ss << "Delete fusion topics: ";
+    for (const auto& name : request->topics) {
+      ss << name << ", ";
+    }
+    RCLCPP_WARN_STREAM(this->get_logger(),
+      ss.str()
+      );
+
     response->result = true;
+
+    for (const auto& name : request->topics) {
+      std::vector<std::string>::iterator iter;
+      for (iter = fusion_topic_names_.begin(); iter <= fusion_topic_names_.end(); iter++) {
+        if (iter == fusion_topic_names_.end()) {
+          RCLCPP_ERROR(this->get_logger(),
+            "Delete fusion topic [%s] failed, which is not existed",
+            name.data());
+          break;
+        }
+        if (*iter == name) {
+          break;
+        }
+      }
+      if (iter == fusion_topic_names_.end()) {
+        break;
+      }
+
+      if (synchronizers_map_.find(name) == synchronizers_map_.end() ||
+        subs_map_.find(name) == subs_map_.end()
+        ) {
+        RCLCPP_ERROR(this->get_logger(),
+          "Delete fusion topic [%s] failed, which is not existed",
+          name.data());
+        continue;
+      }
+
+      fusion_topic_names_.erase(iter);
+      synchronizers_map_.erase(name);
+      subs_map_.erase(name);
+      RCLCPP_WARN_STREAM(this->get_logger(),
+        "Delete fusion topic: " << name << " success"
+        );
+    }
     
   } else if (request->action == tros_ai_fusion_msgs::srv::TopicManage::Request::GET)
   {
     response->result = true;
-    
+    response->topics = fusion_topic_names_;    
   } else {
-    RCLCPP_WARN(this->get_logger(),
+    RCLCPP_ERROR(this->get_logger(),
       "action [%s] is invalid", request->action.c_str());
     response->result = false;
     return;
@@ -125,9 +138,8 @@ void TrosAiMsgFusionNode::TopicSyncCallback(
   std::string base_topic, std::string fusion_topic,
   const ai_msgs::msg::PerceptionTargets::ConstSharedPtr msg1,
   const ai_msgs::msg::PerceptionTargets::ConstSharedPtr msg2) {
-  // return;
-
-  auto copy_msg = [this](const ai_msgs::msg::PerceptionTargets::ConstSharedPtr in_msg)->ai_msgs::msg::PerceptionTargets::SharedPtr{
+  auto copy_msg = [this](const ai_msgs::msg::PerceptionTargets::ConstSharedPtr in_msg)
+    ->ai_msgs::msg::PerceptionTargets::SharedPtr{
     auto msg = std::make_shared<ai_msgs::msg::PerceptionTargets>();
     msg->set__header(in_msg->header);
     msg->set__fps(in_msg->fps);
@@ -160,7 +172,7 @@ void TrosAiMsgFusionNode::TopicSyncCallback(
     iter->second[fusion_topic] = copy_msg(msg2);
     RCLCPP_INFO(
       this->get_logger(),
-      "Messages at [%s] have [%d] msgs.",
+      "Messages at [%s] have [%ld] msgs.",
       time.data(), iter->second.size());
   }
   
@@ -168,18 +180,11 @@ void TrosAiMsgFusionNode::TopicSyncCallback(
   if (iter->second.size() == fusion_topic_names_.size() + 1) {
     RCLCPP_INFO(
       this->get_logger(),
-      "Messages at [%s] are ready with [%d] msgs.",
+      "Messages at [%s] are ready with [%ld] msgs.",
       time.data(), iter->second.size());
 
     FusionMsg(iter->second);
     msg_cache_.erase(iter);
-
-    // MsgCacheType msg_cache = iter->second;
-    // FusionMsg(std::move(msg_cache));
-    // msg_cache_.erase(iter);
-    // std::async(std::launch::async, [this, &msg_cache]() {
-      // FusionMsg(std::move(msg_cache));
-    // });
   }
 
   while (msg_cache_.size() > sync_msgs_cache_max_size_) {
@@ -239,6 +244,38 @@ void TrosAiMsgFusionNode::FusionMsg(MsgCacheType msg_cache) {
   }
   
   ai_msg_publisher_->publish(std::move(*pub_ai_msg));
+}
+
+std::vector<std::string> TrosAiMsgFusionNode::RegisterSynchronizer(const std::vector<std::string>& topic_names) {
+  std::vector<std::string> registered_topics;
+  for (auto & topic : topic_names) {
+    if (topic.empty()) {
+      RCLCPP_ERROR_STREAM(this->get_logger(),
+        "topic name is empty");
+      continue;
+    } else {
+      if (synchronizers_map_.find(topic) != synchronizers_map_.end()) {
+        RCLCPP_ERROR_STREAM(this->get_logger(),
+          "topic name already exists: " << topic);
+        continue;
+      } else {
+        registered_topics.push_back(topic);
+        RCLCPP_WARN_STREAM(this->get_logger(),
+          "topic: " << topic << ", sync with base topic: " << fusion_topic_name_base_);
+        subs_map_[topic].subscribe(this, topic);
+        auto sync = std::make_shared<SynchronizerType>(CustomSyncPolicyType(10), base_sub_, subs_map_[topic]);
+        synchronizers_map_[topic] = sync;
+        synchronizers_map_[topic]->registerCallback(std::bind(&TrosAiMsgFusionNode::TopicSyncCallback,
+          this, fusion_topic_name_base_, topic,
+          std::placeholders::_1, std::placeholders::_2));
+      }
+    }
+  }
+  
+  RCLCPP_WARN(get_logger(),
+    "Registered [%ld] topics with [%s], synchronizers_map_ size [%ld]",
+    registered_topics.size(), fusion_topic_name_base_.data(), synchronizers_map_.size());
+  return registered_topics;
 }
 
 }
