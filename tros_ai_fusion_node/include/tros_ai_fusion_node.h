@@ -32,7 +32,7 @@ class TrosAiMsgFusionNode : public rclcpp::Node {
    message_filters::Subscriber<ai_msgs::msg::PerceptionTargets> base_sub_;
 
    // 不包含 base topic
-   std::vector<std::string> fusion_topic_names_ = {"tros_det", "tros_seg"};
+   std::vector<std::string> fusion_topic_names_ = {};
 
   std::string srv_topic_manage_topic_name_ = "tros_topic_manage";
    rclcpp::Service<tros_ai_fusion_msgs::srv::TopicManage>::SharedPtr srv_topic_manage_ = nullptr;
@@ -54,6 +54,7 @@ class TrosAiMsgFusionNode : public rclcpp::Node {
    std::string base_topic, std::string fusion_topic,
    const ai_msgs::msg::PerceptionTargets::ConstSharedPtr msg1,
    const ai_msgs::msg::PerceptionTargets::ConstSharedPtr msg2);
+   void callback_base_sub(const ai_msgs::msg::PerceptionTargets::ConstSharedPtr msg);
 
    void FusionMsg(MsgCacheType msg_cache);
    std::vector<std::string> RegisterSynchronizer(

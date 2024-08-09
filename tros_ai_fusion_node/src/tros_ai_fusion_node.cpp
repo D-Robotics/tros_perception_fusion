@@ -28,6 +28,11 @@ TrosAiMsgFusionNode::TrosAiMsgFusionNode(const rclcpp::NodeOptions &options) :
     pub_fusion_topic_name_,
     rclcpp::QoS(10));
   base_sub_.subscribe(this, fusion_topic_name_base_);
+  base_sub_.registerCallback(
+    std::bind(
+      &TrosAiMsgFusionNode::callback_base_sub,
+      this,
+      std::placeholders::_1));
   srv_topic_manage_ = this->create_service<tros_ai_fusion_msgs::srv::TopicManage>(
     srv_topic_manage_topic_name_,
     std::bind(&TrosAiMsgFusionNode::topic_manage_callback,
@@ -242,6 +247,18 @@ void TrosAiMsgFusionNode::FusionMsg(MsgCacheType msg_cache) {
       pub_ai_msg->disappeared_targets.push_back(target);
     }
   }
+
+  // clear target and roi types
+  for (auto & target : pub_ai_msg->targets) {
+    if (target.type == "parking_space") {
+      // web会根据 target type 判断是否是分割
+      continue;
+    }
+    target.type = "";
+    for (auto & roi : target.rois) {
+      roi.type = "";
+    }
+  }
   
   ai_msg_publisher_->publish(std::move(*pub_ai_msg));
 }
@@ -254,6 +271,14 @@ std::vector<std::string> TrosAiMsgFusionNode::RegisterSynchronizer(const std::ve
         "topic name is empty");
       continue;
     } else {
+      if (topic == fusion_topic_name_base_) {
+        RCLCPP_ERROR(this->get_logger(),
+          "Fusion topic name [%s] is same with fusion_topic_name_base [%s]",
+          topic.data(), fusion_topic_name_base_.data());
+        rclcpp::shutdown();
+        return registered_topics;
+      }
+
       if (synchronizers_map_.find(topic) != synchronizers_map_.end()) {
         RCLCPP_ERROR_STREAM(this->get_logger(),
           "topic name already exists: " << topic);
@@ -276,6 +301,18 @@ std::vector<std::string> TrosAiMsgFusionNode::RegisterSynchronizer(const std::ve
     "Registered [%ld] topics with [%s], synchronizers_map_ size [%ld]",
     registered_topics.size(), fusion_topic_name_base_.data(), synchronizers_map_.size());
   return registered_topics;
+}
+
+void TrosAiMsgFusionNode::callback_base_sub(const ai_msgs::msg::PerceptionTargets::ConstSharedPtr msg) {
+  if (!msg) return;
+  if (!fusion_topic_names_.empty()) return;
+
+  RCLCPP_WARN_STREAM_THROTTLE(this->get_logger(),
+    *this->get_clock(), 1000,
+    "Fusion topics are empty, passthrough msg"
+  );
+  assert(ai_msg_publisher_);
+  ai_msg_publisher_->publish(*msg);
 }
 
 }
