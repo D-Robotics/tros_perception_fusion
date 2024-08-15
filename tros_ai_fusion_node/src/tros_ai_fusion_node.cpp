@@ -157,7 +157,7 @@ void TrosAiMsgFusionNode::TopicSyncCallback(
 
   std::string time = std::to_string(msg1->header.stamp.sec) + "." + std::to_string(msg1->header.stamp.nanosec);
 
-  RCLCPP_WARN_THROTTLE(this->get_logger(),
+  RCLCPP_INFO_THROTTLE(this->get_logger(),
     *this->get_clock(), 1000,
     "TopicSyncCallback at [%s] with topics [%s] [%s]",
     time.data(), base_topic.data(), fusion_topic.data());
@@ -230,7 +230,7 @@ void TrosAiMsgFusionNode::FusionMsg(MsgCacheType msg_cache) {
   pub_ai_msg->set__disappeared_targets(base_msg->disappeared_targets);
 
 
-  RCLCPP_WARN_STREAM_THROTTLE(this->get_logger(),
+  RCLCPP_INFO_STREAM_THROTTLE(this->get_logger(),
     *this->get_clock(), 1000,
     "Fusion msg at " << base_msg->header.stamp.sec << "." << base_msg->header.stamp.nanosec
     << " with msg size " << msg_cache.size()
