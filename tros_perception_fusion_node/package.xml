@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>tros_ai_fusion_msgs</name>
-  <version>0.0.0</version>
+  <name>tros_perception_fusion</name>
+  <version>0.0.1</version>
   <description>TODO: Package description</description>
   <maintainer email="kao.zhu@d-robotics.cc">kao.zhu</maintainer>
   <license>TODO: License declaration</license>
@@ -15,7 +15,11 @@
   <buildtool_depend>ament_cmake</buildtool_depend>
   
   <depend>rclcpp</depend>
+  <depend>rclcpp_components</depend>
+  <depend>ai_msgs</depend>
+  <depend>message_filters</depend>
   <depend>std_msgs</depend>
+  <depend>tros_perception_fusion_msgs</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

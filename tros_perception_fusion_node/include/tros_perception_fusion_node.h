@@ -24,14 +24,14 @@
 #include "message_filters/sync_policies/approximate_time.h"
 #include "message_filters/sync_policies/exact_time.h"
 #include "ai_msgs/msg/perception_targets.hpp"
-#include "tros_ai_fusion_msgs/srv/topic_manage.hpp"
+#include "tros_perception_fusion_msgs/srv/topic_manage.hpp"
 
 namespace tros {
 
-class TrosAiMsgFusionNode : public rclcpp::Node {
+class TrosPerceptionMsgFusionNode : public rclcpp::Node {
  public:
-   TrosAiMsgFusionNode(const rclcpp::NodeOptions &options);
-   ~TrosAiMsgFusionNode() = default;
+   TrosPerceptionMsgFusionNode(const rclcpp::NodeOptions &options);
+   ~TrosPerceptionMsgFusionNode() = default;
 
  private:
    rclcpp::TimerBase::SharedPtr timer_;
@@ -49,7 +49,7 @@ class TrosAiMsgFusionNode : public rclcpp::Node {
    std::vector<std::string> fusion_topic_names_ = {};
 
   std::string srv_topic_manage_topic_name_ = "tros_topic_manage";
-   rclcpp::Service<tros_ai_fusion_msgs::srv::TopicManage>::SharedPtr srv_topic_manage_ = nullptr;
+   rclcpp::Service<tros_perception_fusion_msgs::srv::TopicManage>::SharedPtr srv_topic_manage_ = nullptr;
 
   // key is topic name
    using MsgCacheType = std::map<std::string, ai_msgs::msg::PerceptionTargets::SharedPtr>;
@@ -64,13 +64,13 @@ class TrosAiMsgFusionNode : public rclcpp::Node {
   int smart_fps_ = -1;
   std::mutex frame_stat_mtx_;
 
-  std::string pub_fusion_topic_name_ = "fusion_ai_msg";
+  std::string pub_fusion_topic_name_ = "tros_perc_fusion";
   rclcpp::Publisher<ai_msgs::msg::PerceptionTargets>::SharedPtr ai_msg_publisher_ = nullptr;
 
    void topic_manage_callback(
    const std::shared_ptr<rmw_request_id_t>/*request_header*/,
-   const std::shared_ptr<tros_ai_fusion_msgs::srv::TopicManage::Request>/*request*/,
-   const std::shared_ptr<tros_ai_fusion_msgs::srv::TopicManage::Response>/*response*/);
+   const std::shared_ptr<tros_perception_fusion_msgs::srv::TopicManage::Request>/*request*/,
+   const std::shared_ptr<tros_perception_fusion_msgs::srv::TopicManage::Response>/*response*/);
    void TopicSyncCallback(
    std::string base_topic, std::string fusion_topic,
    const ai_msgs::msg::PerceptionTargets::ConstSharedPtr msg1,

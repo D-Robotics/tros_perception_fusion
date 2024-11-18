@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "tros_ai_fusion_node.h"
+#include "tros_perception_fusion_node.h"
 
 namespace tros {
 
-TrosAiMsgFusionNode::TrosAiMsgFusionNode(const rclcpp::NodeOptions &options) :
-  Node("tros_ai_fusion", options) {
-  RCLCPP_INFO(this->get_logger(), "TrosAiMsgFusionNode is initializing...");
+TrosPerceptionMsgFusionNode::TrosPerceptionMsgFusionNode(const rclcpp::NodeOptions &options) :
+  Node("tros_perception_fusion", options) {
+  RCLCPP_INFO(this->get_logger(), "TrosPerceptionMsgFusionNode is initializing...");
   this->declare_parameter("topic_names_fusion", rclcpp::ParameterValue(fusion_topic_names_));
   this->get_parameter("topic_names_fusion", fusion_topic_names_);
   fusion_topic_name_base_ = this->declare_parameter("topic_name_base", fusion_topic_name_base_);
@@ -35,9 +35,9 @@ TrosAiMsgFusionNode::TrosAiMsgFusionNode(const rclcpp::NodeOptions &options) :
     << "\n pub_fusion_topic_name [" << pub_fusion_topic_name_ << "]"
     << "\n enable_filter [" << enable_filter_ << "]"
     << "\n srv_topic_manage_topic_name [" << srv_topic_manage_topic_name_
-      << "], you can do action [" << tros_ai_fusion_msgs::srv::TopicManage::Request::ADD
-      << "|" << tros_ai_fusion_msgs::srv::TopicManage::Request::DELETE
-      << "|" << tros_ai_fusion_msgs::srv::TopicManage::Request::GET << "]"
+      << "], you can do action [" << tros_perception_fusion_msgs::srv::TopicManage::Request::ADD
+      << "|" << tros_perception_fusion_msgs::srv::TopicManage::Request::DELETE
+      << "|" << tros_perception_fusion_msgs::srv::TopicManage::Request::GET << "]"
   );
 
   ai_msg_publisher_ = this->create_publisher<ai_msgs::msg::PerceptionTargets>(
@@ -46,25 +46,25 @@ TrosAiMsgFusionNode::TrosAiMsgFusionNode(const rclcpp::NodeOptions &options) :
   base_sub_.subscribe(this, fusion_topic_name_base_);
   base_sub_.registerCallback(
     std::bind(
-      &TrosAiMsgFusionNode::callback_base_sub,
+      &TrosPerceptionMsgFusionNode::callback_base_sub,
       this,
       std::placeholders::_1));
-  srv_topic_manage_ = this->create_service<tros_ai_fusion_msgs::srv::TopicManage>(
+  srv_topic_manage_ = this->create_service<tros_perception_fusion_msgs::srv::TopicManage>(
     srv_topic_manage_topic_name_,
-    std::bind(&TrosAiMsgFusionNode::topic_manage_callback,
+    std::bind(&TrosPerceptionMsgFusionNode::topic_manage_callback,
     this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
     
   RegisterSynchronizer(fusion_topic_names_);
 }
 
-void TrosAiMsgFusionNode::topic_manage_callback(
+void TrosPerceptionMsgFusionNode::topic_manage_callback(
   const std::shared_ptr<rmw_request_id_t>/*request_header*/,
-  const std::shared_ptr<tros_ai_fusion_msgs::srv::TopicManage::Request> request,
-  const std::shared_ptr<tros_ai_fusion_msgs::srv::TopicManage::Response> response) {
+  const std::shared_ptr<tros_perception_fusion_msgs::srv::TopicManage::Request> request,
+  const std::shared_ptr<tros_perception_fusion_msgs::srv::TopicManage::Response> response) {
   RCLCPP_WARN(get_logger(), "topic_manage_callback request->action [%s]",
     request->action.data());
 
-  if (request->action == tros_ai_fusion_msgs::srv::TopicManage::Request::ADD) {
+  if (request->action == tros_perception_fusion_msgs::srv::TopicManage::Request::ADD) {
     if (request->topics.empty()) {
       response->result = false;
       RCLCPP_ERROR_STREAM(this->get_logger(),
@@ -87,7 +87,7 @@ void TrosAiMsgFusionNode::topic_manage_callback(
       fusion_topic_names_.insert(fusion_topic_names_.end(),
         registered_topics.begin(), registered_topics.end());
     }
-  } else if (request->action == tros_ai_fusion_msgs::srv::TopicManage::Request::DELETE)
+  } else if (request->action == tros_perception_fusion_msgs::srv::TopicManage::Request::DELETE)
   {
     if (request->topics.empty()) {
       response->result = false;
@@ -141,7 +141,7 @@ void TrosAiMsgFusionNode::topic_manage_callback(
         );
     }
     
-  } else if (request->action == tros_ai_fusion_msgs::srv::TopicManage::Request::GET)
+  } else if (request->action == tros_perception_fusion_msgs::srv::TopicManage::Request::GET)
   {
     response->result = true;
     response->topics = fusion_topic_names_;    
@@ -155,7 +155,7 @@ void TrosAiMsgFusionNode::topic_manage_callback(
   return;
 }
 
-void TrosAiMsgFusionNode::TopicSyncCallback(
+void TrosPerceptionMsgFusionNode::TopicSyncCallback(
   std::string base_topic, std::string fusion_topic,
   const ai_msgs::msg::PerceptionTargets::ConstSharedPtr msg1,
   const ai_msgs::msg::PerceptionTargets::ConstSharedPtr msg2) {
@@ -235,7 +235,7 @@ void TrosAiMsgFusionNode::TopicSyncCallback(
 }
 
 
-void TrosAiMsgFusionNode::FusionMsg(MsgCacheType msg_cache) {
+void TrosPerceptionMsgFusionNode::FusionMsg(MsgCacheType msg_cache) {
   assert(ai_msg_publisher_);
 
   auto pub_ai_msg = std::make_shared<ai_msgs::msg::PerceptionTargets>();
@@ -381,7 +381,7 @@ void TrosAiMsgFusionNode::FusionMsg(MsgCacheType msg_cache) {
   ai_msg_publisher_->publish(std::move(*pub_ai_msg));
 }
 
-std::vector<std::string> TrosAiMsgFusionNode::RegisterSynchronizer(const std::vector<std::string>& topic_names) {
+std::vector<std::string> TrosPerceptionMsgFusionNode::RegisterSynchronizer(const std::vector<std::string>& topic_names) {
   std::vector<std::string> registered_topics;
   for (auto & topic : topic_names) {
     if (topic.empty()) {
@@ -408,7 +408,7 @@ std::vector<std::string> TrosAiMsgFusionNode::RegisterSynchronizer(const std::ve
         subs_map_[topic].subscribe(this, topic);
         auto sync = std::make_shared<SynchronizerType>(CustomSyncPolicyType(10), base_sub_, subs_map_[topic]);
         synchronizers_map_[topic] = sync;
-        synchronizers_map_[topic]->registerCallback(std::bind(&TrosAiMsgFusionNode::TopicSyncCallback,
+        synchronizers_map_[topic]->registerCallback(std::bind(&TrosPerceptionMsgFusionNode::TopicSyncCallback,
           this, fusion_topic_name_base_, topic,
           std::placeholders::_1, std::placeholders::_2));
       }
@@ -421,7 +421,7 @@ std::vector<std::string> TrosAiMsgFusionNode::RegisterSynchronizer(const std::ve
   return registered_topics;
 }
 
-void TrosAiMsgFusionNode::callback_base_sub(const ai_msgs::msg::PerceptionTargets::ConstSharedPtr msg) {
+void TrosPerceptionMsgFusionNode::callback_base_sub(const ai_msgs::msg::PerceptionTargets::ConstSharedPtr msg) {
   if (!msg) return;
   if (!fusion_topic_names_.empty()) return;
 
@@ -436,4 +436,4 @@ void TrosAiMsgFusionNode::callback_base_sub(const ai_msgs::msg::PerceptionTarget
 }
 
 #include <rclcpp_components/register_node_macro.hpp>
-RCLCPP_COMPONENTS_REGISTER_NODE(tros::TrosAiMsgFusionNode)
+RCLCPP_COMPONENTS_REGISTER_NODE(tros::TrosPerceptionMsgFusionNode)

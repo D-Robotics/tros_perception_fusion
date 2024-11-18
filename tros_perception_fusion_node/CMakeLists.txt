@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(tros_ai_fusion)
+project(tros_perception_fusion)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
@@ -15,17 +15,17 @@ find_package(rclcpp_components REQUIRED)
 find_package(ai_msgs REQUIRED)
 find_package(message_filters REQUIRED)
 find_package(std_msgs REQUIRED)
-find_package(tros_ai_fusion_msgs REQUIRED)
+find_package(tros_perception_fusion_msgs REQUIRED)
 
 add_library(${PROJECT_NAME}_component SHARED
-  src/tros_ai_fusion_node.cpp)
+  src/tros_perception_fusion_node.cpp)
 target_include_directories(${PROJECT_NAME}_component PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
 target_compile_features(${PROJECT_NAME}_component PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
 
 rclcpp_components_register_node(${PROJECT_NAME}_component
-  PLUGIN "tros::TrosAiMsgFusionNode"
+  PLUGIN "tros::TrosPerceptionMsgFusionNode"
   EXECUTABLE ${PROJECT_NAME}
 )
 
@@ -34,7 +34,7 @@ ament_target_dependencies(${PROJECT_NAME}_component
   rclcpp_components
   ai_msgs
   message_filters
-  tros_ai_fusion_msgs
+  tros_perception_fusion_msgs
 )
 
 install(TARGETS ${PROJECT_NAME}_component
@@ -43,7 +43,7 @@ install(TARGETS ${PROJECT_NAME}_component
 install(TARGETS ${PROJECT_NAME}
   DESTINATION lib/${PROJECT_NAME})
 
-# install(DIRECTORY launch DESTINATION share/${PROJECT_NAME})
+install(DIRECTORY launch DESTINATION share/${PROJECT_NAME})
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
