@@ -1,3 +1,17 @@
+// Copyright (c) 2024，D-Robotics.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #include "tros_ai_fusion_node.h"
 
 namespace tros {
@@ -9,6 +23,7 @@ TrosAiMsgFusionNode::TrosAiMsgFusionNode(const rclcpp::NodeOptions &options) :
   this->get_parameter("topic_names_fusion", fusion_topic_names_);
   fusion_topic_name_base_ = this->declare_parameter("topic_name_base", fusion_topic_name_base_);
   pub_fusion_topic_name_= this->declare_parameter("pub_fusion_topic_name", pub_fusion_topic_name_);
+  enable_filter_ = this->declare_parameter("enable_filter", enable_filter_);
 
   std::stringstream ss;
   for (const auto &topic_name : fusion_topic_names_) {
@@ -18,6 +33,7 @@ TrosAiMsgFusionNode::TrosAiMsgFusionNode(const rclcpp::NodeOptions &options) :
     "\n topic_name_base [" << fusion_topic_name_base_ << "]"
     << "\n topic_names_fusion: " << ss.str()
     << "\n pub_fusion_topic_name [" << pub_fusion_topic_name_ << "]"
+    << "\n enable_filter [" << enable_filter_ << "]"
     << "\n srv_topic_manage_topic_name [" << srv_topic_manage_topic_name_
       << "], you can do action [" << tros_ai_fusion_msgs::srv::TopicManage::Request::ADD
       << "|" << tros_ai_fusion_msgs::srv::TopicManage::Request::DELETE
@@ -207,7 +223,10 @@ void TrosAiMsgFusionNode::TopicSyncCallback(
     }
     ss << fusion_topic_name_base_ << "]";
 
-    RCLCPP_WARN_STREAM(this->get_logger(),
+    RCLCPP_INFO_STREAM(this->get_logger(),
+      ss.str()
+      );
+    RCLCPP_WARN_STREAM_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
       ss.str()
       );
     
@@ -248,15 +267,114 @@ void TrosAiMsgFusionNode::FusionMsg(MsgCacheType msg_cache) {
     }
   }
 
-  // clear target and roi types
-  for (auto & target : pub_ai_msg->targets) {
-    if (target.type == "parking_space") {
-      // web会根据 target type 判断是否是分割
-      continue;
+  if (enable_filter_) {
+    std::set<std::string> keys;
+    std::map<std::string, ai_msgs::msg::Target> map_targets;
+    for (auto & target : pub_ai_msg->targets) {
+      if (target.rois.empty()) continue;
+
+      std::string target_key = target.type + std::to_string(target.track_id) + target.rois.front().type;
+      if (map_targets.find(target_key) == map_targets.end()) {
+        map_targets[target_key] = target;
+
+        for (const auto& roi : target.rois) {
+          // 默认一个target只有一个roi
+          std::string roi_key = target_key;
+          if (keys.find(roi_key) == keys.end()) {
+            keys.insert(roi_key);
+          }
+        }
+        for (const auto& attr : target.attributes) {
+          std::string attr_key = target_key + attr.type + std::to_string(attr.value);
+          if (keys.find(attr_key) == keys.end()) {
+            keys.insert(attr_key);
+          }
+        }
+        for (const auto& point : target.points) {
+          std::string kps_key = target_key + point.type;
+          if (keys.find(kps_key) == keys.end()) {
+            keys.insert(kps_key);
+          }
+        }
+
+        continue;
+      } else {
+        for (const auto& roi : target.rois) {
+          std::string roi_key = target_key;
+          if (keys.find(roi_key) == keys.end()) {
+            keys.insert(roi_key);
+            map_targets[target_key].rois.push_back(roi);
+          } else {
+            continue;
+          }
+        }
+
+        for (const auto& attr : target.attributes) {
+          std::string attr_key = target_key + attr.type;
+          if (keys.find(attr_key) == keys.end()) {
+            keys.insert(attr_key);
+            map_targets[target_key].attributes.push_back(attr);
+          } else {
+            continue;
+          }
+        }
+
+        for (const auto& point : target.points) {
+          std::string kps_key = target_key + point.type;
+          if (keys.find(kps_key) == keys.end()) {
+            keys.insert(kps_key);
+            map_targets[target_key].points.push_back(point);
+          } else {
+            continue;
+          }
+        }
+
+        for (const auto& capture : target.captures) {
+          map_targets[target_key].captures.push_back(capture);
+        }
+      }
     }
-    target.type = "";
-    for (auto & roi : target.rois) {
-      roi.type = "";
+    pub_ai_msg->targets.clear();
+    for (const auto& map_target : map_targets) {
+      pub_ai_msg->targets.push_back(map_target.second);
+    }
+  }
+  
+  // clear target and roi types
+  // for (auto & target : pub_ai_msg->targets) {
+  //   if (target.type == "parking_space") {
+  //     // web会根据 target type 判断是否是分割
+  //     continue;
+  //   }
+  //   target.type = "";
+  //   for (auto & roi : target.rois) {
+  //     roi.type = "";
+  //   }
+  // }
+  
+  
+  {
+    std::unique_lock<std::mutex> lk(frame_stat_mtx_);
+    if (!output_tp_) {
+      output_tp_ =
+          std::make_shared<std::chrono::high_resolution_clock::time_point>();
+      *output_tp_ = std::chrono::system_clock::now();
+    }
+    auto tp_now = std::chrono::system_clock::now();
+    output_frameCount_++;
+    auto interval = std::chrono::duration_cast<std::chrono::milliseconds>(
+                        tp_now - *output_tp_)
+                        .count();
+    if (interval >= 5000) {
+      float out_fps = static_cast<float>(output_frameCount_) /
+                      (static_cast<float>(interval) / 1000.0);
+      RCLCPP_WARN(this->get_logger(),
+                  "Pub topic %s fps %.2f",
+                  pub_fusion_topic_name_.data(), out_fps);
+
+      smart_fps_ = round(out_fps);
+      output_frameCount_ = 0;
+      *output_tp_ = std::chrono::system_clock::now();
     }
   }
   
