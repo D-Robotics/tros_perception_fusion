@@ -2,7 +2,7 @@
 
 # 功能介绍
 
-感知融合节点订阅多个[hobot_msgs/ai_msgs/msg/PerceptionTargets](https://github.com/D-Robotics/hobot_msgs/blob/develop/ai_msgs/msg/PerceptionTargets.msg)类型的topic，经过时间对齐后，将所有消息中的数据合并、去重后，再使用一个[hobot_msgs/ai_msgs/msg/PerceptionTargets](https://github.com/D-Robotics/hobot_msgs/blob/develop/ai_msgs/msg/PerceptionTargets.msg)类型的topic后发布。
+感知融合节点订阅多个[hobot_msgs/ai_msgs/msg/PerceptionTargets](https://github.com/D-Robotics/hobot_msgs/blob/develop/ai_msgs/msg/PerceptionTargets.msg)类型的topic，经过时间对齐后，将所有消息中的数据合并、去重后，再使用一个[hobot_msgs/ai_msgs/msg/PerceptionTargets](https://github.com/D-Robotics/hobot_msgs/blob/develop/ai_msgs/msg/PerceptionTargets.msg)类型的topic发布。
 
 支持使用service接口动态查询和修改用于融合的topic。
 
@@ -62,13 +62,9 @@ ComposableNode(
 | 参数名                 | 类型        | 解释                                        | 是否必须 | 支持的配置           | 默认值                        |
 | ---------------------- | ----------- | ------------------------------------------- | -------- | -------------------- | ----------------------------- |
 | topic_name_base | std::string | 订阅的用于融合的基础信息topic名 | 否       | 根据实际部署环境配置 | /tros_perc |
-| topic_names_fusion | std::vector<std::string> | 订阅的用于被融合的信息topic名 | 否       | 根据实际部署环境配置 | 空 |
+| topic_names_fusion | std::string数组 | 订阅的被融合的信息topic名 | 否       | 根据实际部署环境配置 | 空 |
 | pub_fusion_topic_name | std::string | 发布的的融合后的信息topic名   | 否       | 根据实际部署环境配置 | /tros_perc_fusion     |
 | enable_filter | bool | 是否对消息进行去重过滤   | 否       | True/False | True     |
-
-```info
-关于topic_names_fusion和pub_fusion_topic_name的配置说明。
-```
 
 > [!NOTE]
 > 如果`topic_names_fusion`配置为空，发布的消息内容和`topic_name_base`配置中的话题内容相同。
