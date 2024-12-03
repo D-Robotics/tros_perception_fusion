@@ -67,22 +67,23 @@ class TrosPerceptionMsgFusionNode : public rclcpp::Node {
   std::string pub_fusion_topic_name_ = "tros_perc_fusion";
   rclcpp::Publisher<ai_msgs::msg::PerceptionTargets>::SharedPtr ai_msg_publisher_ = nullptr;
 
-   void topic_manage_callback(
-   const std::shared_ptr<rmw_request_id_t>/*request_header*/,
-   const std::shared_ptr<tros_perception_fusion_msgs::srv::TopicManage::Request>/*request*/,
-   const std::shared_ptr<tros_perception_fusion_msgs::srv::TopicManage::Response>/*response*/);
-   void TopicSyncCallback(
-   std::string base_topic, std::string fusion_topic,
-   const ai_msgs::msg::PerceptionTargets::ConstSharedPtr msg1,
-   const ai_msgs::msg::PerceptionTargets::ConstSharedPtr msg2);
-   void callback_base_sub(const ai_msgs::msg::PerceptionTargets::ConstSharedPtr msg);
+  void topic_manage_callback(
+  const std::shared_ptr<rmw_request_id_t>/*request_header*/,
+  const std::shared_ptr<tros_perception_fusion_msgs::srv::TopicManage::Request>/*request*/,
+  const std::shared_ptr<tros_perception_fusion_msgs::srv::TopicManage::Response>/*response*/);
+  void TopicSyncCallback(
+  std::string base_topic, std::string fusion_topic,
+  const ai_msgs::msg::PerceptionTargets::ConstSharedPtr msg1,
+  const ai_msgs::msg::PerceptionTargets::ConstSharedPtr msg2);
+  void callback_base_sub(const ai_msgs::msg::PerceptionTargets::ConstSharedPtr msg);
 
-   void FusionMsg(MsgCacheType msg_cache);
-   std::vector<std::string> RegisterSynchronizer(
-    const std::vector<std::string>& topic_names);
+  void FusionMsg(MsgCacheType msg_cache);
+  std::vector<std::string> RegisterSynchronizer(
+  const std::vector<std::string>& topic_names);
 
   // 融合方法，false: 直接拷贝所有成员；true: 根据内容融合，过滤相同的roi, kps
   bool enable_filter_ = true;
+  bool enable_roi_type_clear_ = false;
 };
 
 }

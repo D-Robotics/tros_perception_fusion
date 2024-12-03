@@ -24,6 +24,7 @@ TrosPerceptionMsgFusionNode::TrosPerceptionMsgFusionNode(const rclcpp::NodeOptio
   fusion_topic_name_base_ = this->declare_parameter("topic_name_base", fusion_topic_name_base_);
   pub_fusion_topic_name_= this->declare_parameter("pub_fusion_topic_name", pub_fusion_topic_name_);
   enable_filter_ = this->declare_parameter("enable_filter", enable_filter_);
+  enable_roi_type_clear_ = this->declare_parameter("enable_roi_type_clear", enable_roi_type_clear_);
 
   std::stringstream ss;
   for (const auto &topic_name : fusion_topic_names_) {
@@ -34,6 +35,7 @@ TrosPerceptionMsgFusionNode::TrosPerceptionMsgFusionNode(const rclcpp::NodeOptio
     << "\n topic_names_fusion: " << ss.str()
     << "\n pub_fusion_topic_name [" << pub_fusion_topic_name_ << "]"
     << "\n enable_filter [" << enable_filter_ << "]"
+    << "\n enable_roi_type_clear [" << enable_roi_type_clear_ << "]"
     << "\n srv_topic_manage_topic_name [" << srv_topic_manage_topic_name_
       << "], you can do action [" << tros_perception_fusion_msgs::srv::TopicManage::Request::ADD
       << "|" << tros_perception_fusion_msgs::srv::TopicManage::Request::DELETE
@@ -341,17 +343,18 @@ void TrosPerceptionMsgFusionNode::FusionMsg(MsgCacheType msg_cache) {
   }
   
   // clear target and roi types
-  // for (auto & target : pub_ai_msg->targets) {
-  //   if (target.type == "parking_space") {
-  //     // web会根据 target type 判断是否是分割
-  //     continue;
-  //   }
-  //   target.type = "";
-  //   for (auto & roi : target.rois) {
-  //     roi.type = "";
-  //   }
-  // }
-  
+  if (enable_roi_type_clear_) {
+    for (auto & target : pub_ai_msg->targets) {
+      if (target.type == "parking_space") {
+        // web会根据 target type 判断是否是分割
+        continue;
+      }
+      target.type = "";
+      for (auto & roi : target.rois) {
+        roi.type = "";
+      }
+    }
+  }
   
   {
     std::unique_lock<std::mutex> lk(frame_stat_mtx_);
